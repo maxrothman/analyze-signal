@@ -48,8 +48,6 @@ int main( int argc, char **argv ) {
    float datai[FFT_SIZE];
    float window[FFT_SIZE];
    float freqTable[FFT_SIZE];
-   char * noteNameTable[FFT_SIZE];
-   float notePitchTable[FFT_SIZE];
    void * fft = NULL;
    struct sigaction action;
 
@@ -77,14 +75,12 @@ int main( int argc, char **argv ) {
    computeSecondOrderLowPassParameters( SAMPLE_RATE, 330, a, b );
    mem1[0] = 0; mem1[1] = 0; mem1[2] = 0; mem1[3] = 0;
    mem2[0] = 0; mem2[1] = 0; mem2[2] = 0; mem2[3] = 0;
+   
    //freq/note tables
    for( int i=0; i<FFT_SIZE; ++i ) {
       freqTable[i] = ( SAMPLE_RATE * i ) / (float) ( FFT_SIZE );
    }
-   for( int i=0; i<FFT_SIZE; ++i ) {
-      noteNameTable[i] = NULL;
-      notePitchTable[i] = -1;
-   }
+
    for( int i=0; i<127; ++i ) {
       float pitch = ( 440.0 / 32.0 ) * pow( 2, (i-9.0)/12.0 ) ;
       if( pitch > SAMPLE_RATE / 2.0 )
@@ -98,10 +94,7 @@ int main( int argc, char **argv ) {
              index = j;
          }
       }
-      noteNameTable[index] = NOTES[i%12];
-      notePitchTable[index] = pitch;
-      //printf( "%f %d %s\n", pitch, index, noteNameTable[index] );
-   }
+    }
 
 
 
@@ -132,64 +125,23 @@ int main( int argc, char **argv ) {
       int maxIndex = -1;
       for( int j=0; j<FFT_SIZE/2; ++j ) {
          float v = data[j] * data[j] + datai[j] * datai[j] ;
-/*
+
          printf( "%d: ", j*SAMPLE_RATE/(2*FFT_SIZE) );
          for( int i=0; i<sqrt(v)*100000000; ++i )
             printf( "*" );
          printf( "\n" );
-*/
+
          if( v > maxVal ) {
             maxVal = v;
             maxIndex = j;
          }
       }
+
       float freq = freqTable[maxIndex];
-      //find the nearest note:
-      int nearestNoteDelta=0;
-      while( true ) {
-         if( nearestNoteDelta < maxIndex && noteNameTable[maxIndex-nearestNoteDelta] != NULL ) {
-            nearestNoteDelta = -nearestNoteDelta;
-            break;
-         } else if( nearestNoteDelta + maxIndex < FFT_SIZE && noteNameTable[maxIndex+nearestNoteDelta] != NULL ) {
-            break;
-         }
-         ++nearestNoteDelta;
-      }
-      char * nearestNoteName = noteNameTable[maxIndex+nearestNoteDelta];
-      float nearestNotePitch = notePitchTable[maxIndex+nearestNoteDelta];
-      float centsSharp = 1200 * log( freq / nearestNotePitch ) / log( 2.0 );
 
       // now output the results:
-      printf("\033[2J\033[1;1H"); //clear screen, go to top left
-      fflush(stdout);
-
-      printf( "Tuner listening. Control-C to exit.\n" );
       printf( "%f Hz, %d : %f\n", freq, maxIndex, maxVal*1000 );
-      printf( "Nearest Note: %s\n", nearestNoteName );
-      if( nearestNoteDelta != 0 ) {
-         if( centsSharp > 0 )
-            printf( "%f cents sharp.\n", centsSharp );
-         if( centsSharp < 0 )
-            printf( "%f cents flat.\n", -centsSharp );
-      } else {
-         printf( "in tune!\n" );
-      }
-      printf( "\n" );
-      int chars = 30;
-      if( nearestNoteDelta == 0 || centsSharp >= 0 ) {
-         for( int i=0; i<chars; ++i )
-            printf( " " );
-      } else {
-         for( int i=0; i<chars+centsSharp; ++i )
-            printf( " " );
-         for( int i=chars+centsSharp<0?0:chars+centsSharp; i<chars; ++i )
-            printf( "=" );
-      }
-      printf( " %2s ", nearestNoteName );
-      if( nearestNoteDelta != 0 )
-         for( int i=0; i<chars && i<centsSharp; ++i )
-           printf( "=" );
-      printf("\n");
+      break
    }
 
    // cleanup
