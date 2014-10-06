@@ -1,3 +1,5 @@
+/* Modified from... */
+
 /* main.c - chromatic guitar tuner
  *
  * Copyright (C) 2012 by Bjorn Roche
@@ -11,13 +13,13 @@
  *
  */
 
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include <signal.h>
 #include "libfft.h"
-#include <portaudio.h>
 
 /* -- some basic parameters -- */
 #define SAMPLE_RATE (8000)
@@ -41,7 +43,6 @@ static char * NOTES[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", 
 
 /* -- main function -- */
 int main( int argc, char **argv ) {
-   PaStreamParameters inputParameters;
    float a[2], b[3], mem1[4], mem2[4];
    float data[FFT_SIZE];
    float datai[FFT_SIZE];
@@ -50,8 +51,6 @@ int main( int argc, char **argv ) {
    char * noteNameTable[FFT_SIZE];
    float notePitchTable[FFT_SIZE];
    void * fft = NULL;
-   PaStream *stream = NULL;
-   PaError err = 0;
    struct sigaction action;
 
    // add signal listen so we know when to exit:
@@ -106,39 +105,12 @@ int main( int argc, char **argv ) {
 
 
 
-   // initialize portaudio
-   err = Pa_Initialize();
-   if( err != paNoError ) goto error;
-
-   inputParameters.device = Pa_GetDefaultInputDevice();
-   inputParameters.channelCount = 1;
-   inputParameters.sampleFormat = paFloat32;
-   inputParameters.suggestedLatency = Pa_GetDeviceInfo( inputParameters.device )->defaultHighInputLatency ;
-   inputParameters.hostApiSpecificStreamInfo = NULL;
-
-   printf( "Opening %s\n",
-           Pa_GetDeviceInfo( inputParameters.device )->name );
-
-   err = Pa_OpenStream( &stream,
-                        &inputParameters,
-                        NULL, //no output
-                        SAMPLE_RATE,
-                        FFT_SIZE,
-                        paClipOff,
-                        NULL,
-                        NULL );
-   if( err != paNoError ) goto error;
-
-   err = Pa_StartStream( stream );
-   if( err != paNoError ) goto error;
-
    // this is the main loop where we listen to and
    // process audio.
    while( running )
    {
-      // read some data
-      err = Pa_ReadStream( stream, data, FFT_SIZE );
-      if( err ) goto error; //FIXME: we don't want to err on xrun
+      // read a chunk of data from STDIN
+      read(STDIN_FILENO, data, FFT_SIZE);
 
       // low-pass
       //for( int i=0; i<FFT_SIZE; ++i )
@@ -219,25 +191,11 @@ int main( int argc, char **argv ) {
            printf( "=" );
       printf("\n");
    }
-   err = Pa_StopStream( stream );
-   if( err != paNoError ) goto error;
 
    // cleanup
    destroyfft( fft );
-   Pa_Terminate();
 
    return 0;
- error:
-   if( stream ) {
-      Pa_AbortStream( stream );
-      Pa_CloseStream( stream );
-   }
-   destroyfft( fft );
-   Pa_Terminate();
-   fprintf( stderr, "An error occured while using the portaudio stream\n" );
-   fprintf( stderr, "Error number: %d\n", err );
-   fprintf( stderr, "Error message: %s\n", Pa_GetErrorText( err ) );
-   return 1;
 }
 
 void buildHammingWindow( float *window, int size )
