@@ -23,9 +23,9 @@
 
 /* -- some basic parameters -- */
 #define SAMPLE_RATE (8000)
-#define FFT_SIZE (8192)
-#define FFT_EXP_SIZE (13)
-#define NUM_SECONDS (20)
+//#define FFT_SIZE (8192)
+#define FFT_SIZE (1024)
+#define FFT_EXP_SIZE (10)     //13 for FFT_SIZE=8192. For each **2 you decrease FFT_SIZE, decrease this by 1
 
 /* -- functions declared and used here -- */
 void buildHammingWindow( float *window, int size );
@@ -39,7 +39,6 @@ void signalHandler( int signum ) ;
 
 static bool running = true;
 
-static char * NOTES[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
 
 /* -- main function -- */
 int main( int argc, char **argv ) {
@@ -103,7 +102,7 @@ int main( int argc, char **argv ) {
    while( running )
    {
       // read a chunk of data from STDIN
-      read(STDIN_FILENO, data, FFT_SIZE);
+      fread(&data, sizeof(float), FFT_SIZE, stdin);
 
       // low-pass
       //for( int i=0; i<FFT_SIZE; ++i )
@@ -125,12 +124,12 @@ int main( int argc, char **argv ) {
       int maxIndex = -1;
       for( int j=0; j<FFT_SIZE/2; ++j ) {
          float v = data[j] * data[j] + datai[j] * datai[j] ;
-
+         /*
          printf( "%d: ", j*SAMPLE_RATE/(2*FFT_SIZE) );
          for( int i=0; i<sqrt(v)*100000000; ++i )
             printf( "*" );
          printf( "\n" );
-
+         */
          if( v > maxVal ) {
             maxVal = v;
             maxIndex = j;
@@ -140,8 +139,7 @@ int main( int argc, char **argv ) {
       float freq = freqTable[maxIndex];
 
       // now output the results:
-      printf( "%f Hz, %d : %f\n", freq, maxIndex, maxVal*1000 );
-      break
+      printf( "%f Hz %f\n", freq, maxVal*1000 );
    }
 
    // cleanup
