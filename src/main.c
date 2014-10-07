@@ -17,12 +17,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <getopt.h>
 #include <math.h>
 #include <signal.h>
 #include "libfft.h"
 
 /* -- some basic parameters -- */
-#define SAMPLE_RATE (8000)
+#define SAMPLE_RATE (44100)
 //#define FFT_SIZE (8192)
 #define FFT_SIZE (1024)
 #define FFT_EXP_SIZE (10)     //13 for FFT_SIZE=8192. For each **2 you decrease FFT_SIZE, decrease this by 1
@@ -93,8 +94,7 @@ int main( int argc, char **argv ) {
              index = j;
          }
       }
-    }
-
+   }
 
 
    // this is the main loop where we listen to and
@@ -103,6 +103,14 @@ int main( int argc, char **argv ) {
    {
       // read a chunk of data from STDIN
       fread(&data, sizeof(float), FFT_SIZE, stdin);
+
+      //get the amplitude
+      // float rms = 0;
+      // for (int i=0; i<FFT_SIZE; i++) {
+      //    rms += data[i]*data[i];
+      // }
+      // rms = rms/FFT_SIZE;
+      // rms = sqrt(rms);
 
       // low-pass
       //for( int i=0; i<FFT_SIZE; ++i )
@@ -139,7 +147,8 @@ int main( int argc, char **argv ) {
       float freq = freqTable[maxIndex];
 
       // now output the results:
-      printf( "%f Hz %f\n", freq, maxVal*1000 );
+      printf( "%f %f\n", freq, maxVal*1000 );
+      //printf( "%f %f\n", freq, rms );
    }
 
    // cleanup
