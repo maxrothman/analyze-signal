@@ -4,9 +4,9 @@ HEADERS := $(wildcard src/*.h)
 
 CFLAGS += -O2 -Wall -Werror -std=c99 -D_XOPEN_SOURCE
 
-all: tuner
+all: analyze-signal
 
-tuner: $(OBJS)
+analyze-signal: $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
 
 objs:
@@ -16,5 +16,5 @@ objs/%.o: src/%.c $(HEADERS) | objs
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
-	-rm tuner
+	-rm analyze-audio
 	-rm -r objs
