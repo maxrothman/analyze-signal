@@ -1,16 +1,16 @@
-/* Modified from... */
+/* Analyze Signal - main.c
+ * Simple command-line signal processing
+ * <https://github.com/whereswalden90/analyze-signal>
+ *
+ * DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE
+ * TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION
+ *
+ * 0. You just DO WHAT THE FUCK YOU WANT TO.
+ */
 
-/* main.c - chromatic guitar tuner
- *
+/* Modified from chromatic guitar tuner
+ * <https://github.com/bejayoharen/>
  * Copyright (C) 2012 by Bjorn Roche
- *
- * Permission to use, copy, modify, and distribute this software and its
- * documentation for any purpose and without fee is hereby granted, provided
- * that the above copyright notice appear in all copies and that both that
- * copyright notice and this permission notice appear in supporting
- * documentation.  This software is provided "as is" without express or
- * implied warranty.
- *
  */
 
 #include <unistd.h>
@@ -23,10 +23,61 @@
 #include "libfft.h"
 
 /* -- some basic parameters -- */
-#define SAMPLE_RATE (44100)
-//#define FFT_SIZE (8192)
-#define FFT_SIZE (1024)
-#define FFT_EXP_SIZE (10)     //13 for FFT_SIZE=8192. For each **2 you decrease FFT_SIZE, decrease this by 1
+// #define SAMPLE_RATE (44100)
+// //#define FFT_SIZE (8192)
+// #define FFT_SIZE (1024)
+// #define FFT_EXP_SIZE (10)     //13 for FFT_SIZE=8192. For each **2 you decrease FFT_SIZE, decrease this by 1
+
+
+static const char[] HELP = "
+Analyze Signal - simple command-line signal processing
+
+
+USAGE: analyze-signal [-options] < <signal>
+
+
+DESCRIPTION
+
+Perform various signal processing algorithms on a signal read from STDIN.
+The signal must be 1-channel, raw floating-point PCM data. Its sample rate
+must match analyze-signal's expected sample rate (-r).
+
+The default output is of the form:
+
+FREQUENCY AMPLITUDE RMS
+
+where AMPLITUDE is the power of FREQUENCY in the signal.
+
+I recommend <http://sox.sourceforge.net/> for doing conversion from standard 
+audio formats. The relavent sox command then would be (assuming 2-channel input): 
+
+sox <input> -r <rate> -t raw -e floating-point - rate remix 1,2 | analyze-signal -r <rate>
+
+Note that the choice of sample rate and fft bin size affects the accuracy of
+frequency measurements by this relationship:
+
+freq_accuracy = sample_rate/fft_bin_size
+
+For example, with a sample rate of 8000 and fft bin size of 8192, frequency
+measurements will be accurate within ~1 Hz.
+
+
+OPTIONS
+   -r, --sample-rate <rate>   Sample rate of incoming signal. (Default: 8000)
+   -s, --fft-size <bin-size>  FFT bin size. Should be a power of 2.
+      Lowering increases performance at the expense of accuracy. (Default: 8192)
+   -f, --frequency            Show the frequency in the results. (Default: true)
+   -a, --amplitude            Show the amplitude in the results. (Default: true)
+   -R, --rms                  Show the root-mean-square amplitude of the whole signal
+      (not just the power of a single frequency) in the results. (Default: false)
+   -h, --help                 Show this message and exit.
+   -V, --version              Show the version and exit.
+";
+
+static const char[] VERSION = "
+analyze-signal 1.0
+https://github.com/whereswalden90/analyze-signal
+";
 
 /* -- functions declared and used here -- */
 void buildHammingWindow( float *window, int size );
@@ -70,6 +121,44 @@ int main( int argc, char **argv ) {
    }
    exit(0);
 */
+
+   // Default argument values
+   int SAMPLE_RATE = 8000;
+   int FFT_SIZE = 8192;
+   bool RMS = false, FREQUENCY = true, AMPLITUDE = true;
+
+    // Parse the arguments
+   static struct option options[] {
+      {"sample-rate", required_argument, 0, 'r'},
+      {"fft-size",    required_argument, 0, 's'},
+      {"amplitude",   no_argument,       0, 'a'},
+      {"frequency",   no_argument,       0, 'f'},
+      {"rms",         no_argument,       0, 'R'},
+      {"help",        no_argument,       0, 'h'},
+      {"version",     no_argument,       0, 'V'},
+      {0,             0,                 0,  0 }
+   };
+
+   int opts_index = 0;
+   while ((opt = getopt_long(argc, argv, "r:s:afRhV", 
+                   options, &opts_index )) != -1) {
+      switch (opt) {
+         case 'r': SAMPLE_RATE = atoi(optarg); break;
+         case 's': FFT_SIZE    = atoi(optarg); break;
+         case 'f': FREQUENCY   = true;         break;
+         case 'a': AMPLITUDE   = true;         break;
+         case 'R': RMS         = true;         break;
+         case 'h': printf(HELP);               exit(0);
+         case 'V': printf(VERSION);            exit(0);
+         case default: printf(HELP);           exit(1);
+      }
+   }
+
+   //TODO: validate sample rate & fft size
+   int FFT_EXP_SIZE = (int) ( log((float) FFT_SIZE) / log(2.0) );
+
+
+
    buildHanWindow( window, FFT_SIZE );
    fft = initfft( FFT_EXP_SIZE );
    computeSecondOrderLowPassParameters( SAMPLE_RATE, 330, a, b );
@@ -104,13 +193,15 @@ int main( int argc, char **argv ) {
       // read a chunk of data from STDIN
       fread(&data, sizeof(float), FFT_SIZE, stdin);
 
-      //get the amplitude
-      // float rms = 0;
-      // for (int i=0; i<FFT_SIZE; i++) {
-      //    rms += data[i]*data[i];
-      // }
-      // rms = rms/FFT_SIZE;
-      // rms = sqrt(rms);
+      if (RMS) {
+         // get the RMS amplitude
+         float rms = 0;
+         for (int i=0; i<FFT_SIZE; i++) {
+            rms += data[i]*data[i];
+         }
+         rms = rms/FFT_SIZE;
+         rms = sqrt(rms);
+      }
 
       // low-pass
       //for( int i=0; i<FFT_SIZE; ++i )
@@ -147,8 +238,11 @@ int main( int argc, char **argv ) {
       float freq = freqTable[maxIndex];
 
       // now output the results:
-      printf( "%f %f\n", freq, maxVal*1000 );
-      //printf( "%f %f\n", freq, rms );
+      if (RMS) {
+         printf( "%f %f\n", freq, rms );
+      } else {
+         printf( "%f %f\n", freq, maxVal*1000 );
+      }
    }
 
    // cleanup
