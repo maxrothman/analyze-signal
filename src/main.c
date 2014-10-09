@@ -98,21 +98,24 @@ int main( int argc, char **argv ) {
 
 
    //Parse the arguments
-   while (true) {
-      static struct option options[] = {
-         {"sample-rate", required_argument, 0, 'r'},
-         {"fft-size",    required_argument, 0, 's'},
-         {"amplitude",   no_argument,       0, 'a'},
-         {"frequency",   no_argument,       0, 'f'},
-         {"rms",         no_argument,       0, 'R'},
-         {"help",        no_argument,       0, 'h'},
-         {"version",     no_argument,       0, 'V'},
-         {0,             0,                 0,  0 }
-      };
-      int opts_index = 0, opt = 0;
+   static struct option options[] = {
+      {"sample-rate", required_argument, 0, 'r'},
+      {"fft-size",    required_argument, 0, 's'},
+      {"amplitude",   no_argument,       0, 'a'},
+      {"frequency",   no_argument,       0, 'f'},
+      {"rms",         no_argument,       0, 'R'},
+      {"help",        no_argument,       0, 'h'},
+      {"version",     no_argument,       0, 'V'},
+      {0,             0,                 0,  0 }
+   };
+   int opts_index = 0, opt = 0;
 
-      opt = getopt_long(argc, argv, "r:s:afRhV", options, &opts_index );
-      if (opt == -1) { break; }
+   if (argc == 1) { 
+      printf("%s", HELP);
+      exit(2);
+   }
+   while ((opt = getopt_long(argc, argv, "r:s:afRhV", 
+                   options, &opts_index )) != -1) {
 
       switch (opt) {
          case 'r': SAMPLE_RATE = atoi(optarg); break;
@@ -120,14 +123,14 @@ int main( int argc, char **argv ) {
          case 'f': FREQUENCY   = true;         break;
          case 'a': AMPLITUDE   = true;         break;
          case 'R': RMS         = true;         break;
-         case 'h': printf(HELP);               exit(0);
-         case 'V': printf(VERSION);            exit(0);
-         default: printf(HELP);                exit(2);
+         case 'h': printf("%s", HELP);         exit(0);
+         case 'V': printf("%s", VERSION);      exit(0);
+         default: printf("%s", HELP);          exit(2);
       }
    }
 
    if (AMPLITUDE && !FREQUENCY) {
-      printf("--amplitude cannot be used without --frequency");
+      printf("ERROR: --amplitude cannot be used without --frequency\n");
       exit(2);
    }
 
@@ -203,7 +206,7 @@ int main( int argc, char **argv ) {
 
       if (RMS) {
          // get the RMS amplitude
-         float rms = 0;
+         rms = 0;
          for (int i=0; i<FFT_SIZE; i++) {
             rms += data[i]*data[i];
          }
