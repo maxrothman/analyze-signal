@@ -202,7 +202,10 @@ int main( int argc, char **argv ) {
    while( running )
    {
       // read a chunk of data from STDIN
-      fread(&data, sizeof(float), FFT_SIZE, stdin);
+      int read = fread(&data, sizeof(float), FFT_SIZE, stdin);
+      if (read != FFT_SIZE) {
+         exit(0);
+      }
 
       if (RMS) {
          // get the RMS amplitude
@@ -252,7 +255,7 @@ int main( int argc, char **argv ) {
 
       // now output the results:
       if (FREQUENCY) { printf("%f ", freq); }
-      if (AMPLITUDE) { printf("%f ", maxVal); }
+      if (AMPLITUDE) { printf("%f ", maxVal*10000); }
       if (RMS) { printf( "%f ", rms ); }
       printf("\n");
 
