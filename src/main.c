@@ -22,13 +22,9 @@
 #include <signal.h>
 #include "libfft.h"
 
-/* -- some basic parameters -- */
-// #define SAMPLE_RATE (44100)
-// //#define FFT_SIZE (8192)
-// #define FFT_SIZE (1024)
-// #define FFT_EXP_SIZE (10)     //13 for FFT_SIZE=8192. For each **2 you decrease FFT_SIZE, decrease this by 1
-   
-static const char HELP[] = "Analyze Signal - simple command-line signal processing\n"
+
+ static const char HELP[] = "\n"
+   "Analyze Signal - simple command-line signal processing\n"
    "\n"
    "\n"
    "USAGE: analyze-signal [options] < <signal>\n"
@@ -42,9 +38,9 @@ static const char HELP[] = "Analyze Signal - simple command-line signal processi
    "\n"
    "The default output is of the form:\n"
    "\n"
-   "FREQUENCY AMPLITUDE RMS\n"
+   "FREQUENCY POWER AMPLITUDE\n"
    "\n"
-   "where AMPLITUDE is the power of FREQUENCY in the signal.\n"
+   "where POWER is the power of FREQUENCY in the signal.\n"
    "\n"
    "I recommend <http://sox.sourceforge.net/> for doing conversion from standard \n"
    "audio formats. The relavent sox command then would be (assuming 2-channel input): \n"
@@ -65,8 +61,8 @@ static const char HELP[] = "Analyze Signal - simple command-line signal processi
    "   -s, --fft-size <bin-size>  FFT bin size. Should be a power of 2.\n"
    "      Lowering increases performance at the expense of accuracy. (Default: 8192)\n"
    "   -f, --frequency            Show the frequency in the results. (Default: false)\n"
-   "   -a, --amplitude            Show the amplitude in the results. (Default: false)\n"
-   "   -R, --rms                  Show the root-mean-square amplitude of the whole signal\n"
+   "   -p, --power                Show the frequency's power in the results. (Default: false)\n"
+   "   -a, --amplitude            Show the root-mean-square amplitude of the whole signal\n"
    "      (not just the power of a single frequency) in the results. (Default: false)\n"
    "   -h, --help                 Show this message and exit.\n"
    "   -V, --version              Show the version and exit.\n";
@@ -90,11 +86,11 @@ static bool running = true;
 
 /* -- main function -- */
 int main( int argc, char **argv ) {
-
+   
    // Default argument values
    int SAMPLE_RATE = 8000;
    int FFT_SIZE = 8192;
-   bool RMS = false, FREQUENCY = false, AMPLITUDE = false;
+   bool POWER = false, FREQUENCY = false, AMPLITUDE = false;
 
 
    //Parse the arguments
@@ -103,7 +99,7 @@ int main( int argc, char **argv ) {
       {"fft-size",    required_argument, 0, 's'},
       {"amplitude",   no_argument,       0, 'a'},
       {"frequency",   no_argument,       0, 'f'},
-      {"rms",         no_argument,       0, 'R'},
+      {"power",       no_argument,       0, 'p'},
       {"help",        no_argument,       0, 'h'},
       {"version",     no_argument,       0, 'V'},
       {0,             0,                 0,  0 }
@@ -114,7 +110,7 @@ int main( int argc, char **argv ) {
       printf("%s", HELP);
       exit(2);
    }
-   while ((opt = getopt_long(argc, argv, "r:s:afRhV", 
+   while ((opt = getopt_long(argc, argv, "r:s:afphV", 
                    options, &opts_index )) != -1) {
 
       switch (opt) {
@@ -122,24 +118,22 @@ int main( int argc, char **argv ) {
          case 's': FFT_SIZE    = atoi(optarg); break;
          case 'f': FREQUENCY   = true;         break;
          case 'a': AMPLITUDE   = true;         break;
-         case 'R': RMS         = true;         break;
+         case 'p': POWER       = true;         break;
          case 'h': printf("%s", HELP);         exit(0);
          case 'V': printf("%s", VERSION);      exit(0);
          default: printf("%s", HELP);          exit(2);
       }
    }
-
-   if (AMPLITUDE && !FREQUENCY) {
+   if (POWER && !FREQUENCY) {
       printf("ERROR: --amplitude cannot be used without --frequency\n");
       exit(2);
    }
-
    int FFT_EXP_SIZE = (int) ( log((float) FFT_SIZE) / log(2.0) );
 
 
    //Declarations
-   float freq = -1;
-   float maxVal = -1;
+   float freq;
+   float maxVal;
    float rms = -1;
    float a[2], b[3], mem1[4], mem2[4];
    float data[FFT_SIZE];
@@ -168,8 +162,6 @@ int main( int argc, char **argv ) {
    }
    exit(0);
 */
-
-
    buildHanWindow( window, FFT_SIZE );
    fft = initfft( FFT_EXP_SIZE );
    computeSecondOrderLowPassParameters( SAMPLE_RATE, 330, a, b );
@@ -202,12 +194,12 @@ int main( int argc, char **argv ) {
    while( running )
    {
       // read a chunk of data from STDIN
-      int read = fread(&data, sizeof(float), FFT_SIZE, stdin);
-      if (read != FFT_SIZE) {
-         exit(0);
+      int nread = fread(&data, sizeof(float), FFT_SIZE, stdin);
+      if (nread < FFT_SIZE) {
+         break;
       }
 
-      if (RMS) {
+      if (AMPLITUDE) {
          // get the RMS amplitude
          rms = 0;
          for (int i=0; i<FFT_SIZE; i++) {
@@ -216,7 +208,6 @@ int main( int argc, char **argv ) {
          rms = rms/FFT_SIZE;
          rms = sqrt(rms);
       }
-
 
       if (FREQUENCY) {
          // low-pass
@@ -235,6 +226,7 @@ int main( int argc, char **argv ) {
          applyfft( fft, data, datai, false );
 
          //find the peak
+         maxVal = -1;
          int maxIndex = -1;
          for( int j=0; j<FFT_SIZE/2; ++j ) {
             float v = data[j] * data[j] + datai[j] * datai[j] ;
@@ -255,11 +247,10 @@ int main( int argc, char **argv ) {
 
       // now output the results:
       if (FREQUENCY) { printf("%f ", freq); }
-      if (AMPLITUDE) { printf("%f ", maxVal*10000); }
-      if (RMS) { printf( "%f ", rms ); }
+      if (POWER) { printf("%f ", maxVal*10000); }
+      if (AMPLITUDE) { printf( "%f ", rms*10 ); }
       printf("\n");
-
-      //printf( "%f %f\n", freq, maxVal*1000 );
+      // printf( "%f %f\n", freq, maxVal*1000 );
    }
 
    // cleanup
@@ -304,11 +295,11 @@ float processSecondOrderFilter( float x, float *mem, float *a, float *b )
     float ret = b[0] * x + b[1] * mem[0] + b[2] * mem[1]
                          - a[0] * mem[2] - a[1] * mem[3] ;
 
-		mem[1] = mem[0];
-		mem[0] = x;
-		mem[3] = mem[2];
-		mem[2] = ret;
+      mem[1] = mem[0];
+      mem[0] = x;
+      mem[3] = mem[2];
+      mem[2] = ret;
 
-		return ret;
+      return ret;
 }
 void signalHandler( int signum ) { running = false; }
