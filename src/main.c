@@ -86,7 +86,8 @@ static bool running = true;
 
 /* -- main function -- */
 int main( int argc, char **argv ) {
-   
+   setlinebuf(stdout);   //so results can be piped to other stuff
+
    // Default argument values
    int SAMPLE_RATE = 8000;
    int FFT_SIZE = 8192;
